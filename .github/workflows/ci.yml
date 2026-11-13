@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        python: ["3.11", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install
+        run: python -m pip install -r requirements.txt
+      - name: Unit, integration and end-to-end tests (offline)
+        run: python -m pytest -q
+      - name: Detector accuracy on the labelled synthetic set (fails on any miss or false alert)
+        run: python -m bgpwatch evaluate --seeds 7,11,23 --strict
+      - name: Replay the recorded real RIS Live sample (offline; fails if the sample is missing)
+        shell: bash
+        run: |
+          ls data/samples/*/messages.jsonl.gz
+          for b in data/samples/*/; do python -m bgpwatch replay "$b" --db data/ci-replay.db --quiet; done

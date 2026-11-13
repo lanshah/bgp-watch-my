@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bgp-watch-my"
+version = "1.0.0"
+description = "Live BGP monitoring for Malaysian networks: hijack, leak, RPKI and visibility detection on RIPE RIS Live"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = ["websockets>=12"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+bgpwatch = "bgpwatch.cli:main"
+
+[tool.setuptools]
+packages = ["bgpwatch"]
+
+[tool.setuptools.package-data]
+bgpwatch = ["static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

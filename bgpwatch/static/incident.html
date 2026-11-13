@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Incident · BGP Watch Malaysia</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header>
+  <h1><a href="/" style="color:inherit">BGP Watch <span>Malaysia</span></a></h1>
+  <span id="mode" class="badge"></span>
+  <span class="spacer"></span>
+  <a href="/" class="btn">← Dashboard</a>
+</header>
+<div id="banner" class="banner" hidden></div>
+<main id="root"><div class="empty">Loading incident…</div></main>
+<script>
+"use strict";
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const MYT = 8 * 3600 * 1000;
+const fmt = (ts) => ts ? new Date(ts * 1000 + MYT).toISOString().replace("T", " ").slice(0, 19) + " MYT" : "-";
+const dur = (s) => s < 90 ? Math.round(s) + " s" : s < 5400 ? Math.round(s / 60) + " min" : (s / 3600).toFixed(1) + " h";
+const sev = (s) => `<span class="sev ${esc(s)}">${esc(s)}</span>`;
+function pathHtml(path, actor) {
+  if (!path || !path.length) return "-";
+  return '<span class="path">' + path.map((h, i) => `<span class="asn${h === actor ? " actor" : ""}${i === path.length - 1 ? " origin" : ""}">${esc(Array.isArray(h) ? "{" + h.join(",") + "}" : h)}</span>`).join("") + "</span>";
+}
+function chart(samples) {
+  if (!samples || samples.length < 2) return "";
+  const byP = {};
+  samples.forEach((s) => (byP[s.prefix] = byP[s.prefix] || []).push(s));
+  const t0 = Math.min(...samples.map((s) => s.ts)), t1 = Math.max(...samples.map((s) => s.ts));
+  const W = 1000, H = 180, x = (t) => 40 + ((t - t0) / Math.max(1, t1 - t0)) * (W - 50), y = (r) => 10 + (1 - r) * (H - 30);
+  const lines = Object.values(byP).slice(0, 8).map((rows) => `<polyline fill="none" stroke="var(--critical)" stroke-width="2" points="${rows.map((r) => x(r.ts).toFixed(1) + "," + y(r.ratio).toFixed(1)).join(" ")}"/>`).join("");
+  const grid = [0, 0.2, 0.6, 1].map((r) => `<line x1="40" x2="${W - 10}" y1="${y(r)}" y2="${y(r)}" stroke="var(--line)" ${r === 0.6 || r === 0.2 ? 'stroke-dasharray="4 4"' : ""}/><text x="4" y="${y(r) + 4}">${r * 100}%</text>`).join("");
+  return `<section><h2>Visibility over time (share of baseline RIS peers; dashed = warning 60 % / critical 20 %)</h2><svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${grid}${lines}<text x="40" y="${H - 4}">${esc(fmt(t0))}</text><text x="${W - 230}" y="${H - 4}">${esc(fmt(t1))}</text></svg></section>`;
+}
+(async () => {
+  const id = new URLSearchParams(location.search).get("id");
+  const [inc, sum] = await Promise.all([fetch("/api/incident/" + encodeURIComponent(id)).then((r) => r.json()), fetch("/api/summary").then((r) => r.json())]);
+  const root = document.getElementById("root");
+  if (inc.error) { root.innerHTML = '<div class="empty">Incident not found.</div>'; return; }
+  const mode = sum.meta.mode;
+  const m = document.getElementById("mode");
+  m.textContent = mode === "live" ? "LIVE" : mode === "synthetic" ? "SYNTHETIC REPLAY" : "REPLAY";
+  m.className = "badge " + (mode === "live" ? "live" : mode === "synthetic" ? "synthetic" : "replay");
+  if (mode === "synthetic") { const b = document.getElementById("banner"); b.hidden = false; b.textContent = "SYNTHETIC TEST DATA: fictional networks, documentation ASNs and test prefixes. Not a real event."; }
+  const net = (sum.networks.find((n) => n.key === inc.network) || {}).name || inc.network;
+  const x = inc.explanation || {}, ev = inc.evidence || {}, first = ev.first || {};
+  document.title = `#${inc.id} ${inc.kind} · BGP Watch Malaysia`;
+  const perPrefix = Object.entries(ev.per_prefix || {});
+  const rpki = first.rpki;
+  root.innerHTML = `
+    <section>
+      <div class="toolbar">${sev(inc.severity)} <span class="status-${esc(inc.status)}">${esc(inc.status.toUpperCase())}</span>
+        <span class="muted">Incident #${Number(inc.id)} · ${esc(inc.kind.replace(/_/g, " "))} · ${esc(net)}</span></div>
+      <h2 style="font-size:20px;margin:4px 0 10px">${esc(x.summary || inc.title)}</h2>
+      <div class="kpis">
+        <div class="kpi"><div class="v">${esc(fmt(inc.first_seen).slice(11))}</div><div class="l">first seen (${esc(fmt(inc.first_seen).slice(0, 10))})</div></div>
+        <div class="kpi"><div class="v">${dur((inc.resolved_at || inc.last_seen) - inc.first_seen)}</div><div class="l">${inc.status === "resolved" ? "duration" : "open for"}</div></div>
+        ${inc.kind === "visibility_drop"
+          ? `<div class="kpi"><div class="v">${ev.worst && ev.worst.ratio != null ? (ev.worst.ratio * 100).toFixed(0) + " %" : "-"}</div><div class="l">worst visibility${ev.worst ? " (" + esc(ev.worst.seen) + "/" + esc(ev.worst.baseline) + " peers)" : ""}</div></div>`
+          : `<div class="kpi"><div class="v">${esc(inc.status === "resolved" ? (ev.peers_ever || inc.peers) : inc.peers)}</div><div class="l">RIS peers ${inc.status === "resolved" ? "that carried it" : "carrying it now"}</div></div>`}
+        <div class="kpi"><div class="v">${inc.prefixes.length}</div><div class="l">prefixes affected</div></div>
+        <div class="kpi"><div class="v">${esc(inc.findings)}</div><div class="l">raw findings folded in</div></div>
+        <div class="kpi"><div class="v">${inc.actor_asn ? "AS" + esc(inc.actor_asn) : "-"}</div><div class="l">AS involved</div></div>
+      </div>
+    </section>
+    <div class="explain why"><h3>Why this fired</h3><p>${esc(x.why)}</p></div>
+    <div class="two">
+      <div class="explain"><h3>What it could mean</h3><p>${esc(x.meaning)}</p></div>
+      <div class="explain"><h3>What to check next</h3><p>${esc(x.check)}</p></div>
+    </div>
+    ${first.path ? `<section><h2>Example route (first evidence)</h2><table><tbody>
+      <tr><th style="width:180px">Prefix</th><td class="mono">${esc(first.prefix)}</td></tr>
+      <tr><th>AS path (origin outlined, suspect AS red)</th><td>${pathHtml(first.path, inc.actor_asn)}</td></tr>
+      <tr><th>Seen by RIS peer</th><td class="mono">${esc(first.peer)} (AS${esc(first.peer_asn)}) on ${esc(first.collector)}</td></tr>
+      ${rpki ? `<tr><th>RPKI (RFC 6811)</th><td><b>${esc(rpki.state)}</b>${rpki.reason ? " (" + esc(rpki.reason) + ")" : ""}<div class="muted">${esc(rpki.text)}</div></td></tr>` : ""}
+      ${first.expected_origins ? `<tr><th>Expected origins</th><td class="mono">${esc(first.expected_origins.map((a) => "AS" + a).join(", "))}</td></tr>` : ""}
+      ${first.covering_prefix ? `<tr><th>Covering watched prefix</th><td class="mono">${esc(first.covering_prefix)}</td></tr>` : ""}
+    </tbody></table></section>` : ""}
+    ${chart(inc.visibility)}
+    <section><h2>Affected prefixes</h2><table><thead><tr><th>Prefix</th><th>First seen</th><th>Last evidence</th><th>Detail</th></tr></thead><tbody>
+      ${perPrefix.map(([p, d]) => `<tr><td class="mono">${esc(p)}</td><td class="mono">${esc(fmt(d.first_seen))}</td><td class="mono">${esc(fmt(d.last_seen))}</td>
+        <td>${d.ratio != null ? `${esc(d.seen)}/${esc(d.baseline)} peers (${(d.ratio * 100).toFixed(0)} %)` : d.rpki ? "RPKI " + esc(d.rpki) : ""}</td></tr>`).join("")}
+    </tbody></table></section>
+    <section><h2>Notifications</h2><table><thead><tr><th>Time</th><th>Channel</th><th>Severity</th><th>Reason</th></tr></thead><tbody>
+      ${inc.notifications.map((n) => `<tr><td class="mono">${esc(fmt(n.ts))}</td><td>${esc(n.channel)}${n.delivered ? "" : " (not delivered: " + esc(n.error) + ")"}</td><td>${sev(n.severity)}</td><td>${esc(n.reason)}</td></tr>`).join("") || '<tr><td colspan="4" class="muted">Not notified (below the paging threshold, or waiting for confirmation).</td></tr>'}
+    </tbody></table></section>
+    <section><h2>Raw BGP updates for these prefixes (±10 min)</h2><div class="scroll" style="max-height:420px"><table><thead><tr><th>Time</th><th>Type</th><th>Prefix</th><th>Origin</th><th>AS path</th><th>RIS peer</th></tr></thead><tbody>
+      ${inc.updates.map((u) => { let p = []; try { p = JSON.parse(u.path || "[]"); } catch (e) {} return `<tr class="${u.flagged ? "flag" : ""}"><td class="mono">${esc(fmt(u.ts))}</td><td>${u.kind === "A" ? "announce" : "withdraw"}</td><td class="mono">${esc(u.prefix)}</td><td class="mono">${u.origin ? "AS" + esc(u.origin) : ""}</td><td>${pathHtml(p, inc.actor_asn)}</td><td class="mono muted">${esc(u.peer)}</td></tr>`; }).join("") || '<tr><td colspan="6" class="muted">No updates stored for this window.</td></tr>'}
+    </tbody></table></div></section>
+    <div class="explain"><h3>Limits of this evidence</h3><p>${esc(x.limits)}</p></div>
+    <details><summary>Raw evidence (JSON)</summary><pre>${esc(JSON.stringify(ev, null, 1))}</pre></details>`;
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BGP Watch Malaysia</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header>
+  <h1>BGP Watch <span>Malaysia</span></h1>
+  <span id="mode" class="badge">…</span>
+  <span id="conn" class="muted"><span class="dot"></span>…</span>
+  <span class="spacer"></span>
+  <span id="clock" class="muted mono"></span>
+</header>
+<div id="banner" class="banner" hidden></div>
+<main>
+  <div class="kpis" id="kpis"></div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="overview" class="active">Overview</button>
+    <button data-tab="feed">Live feed</button>
+    <button data-tab="prefixes">Prefix visibility</button>
+    <button data-tab="alerts">Alert log</button>
+    <button data-tab="about">How it works</button>
+  </nav>
+
+  <div id="tab-overview">
+    <section><h2>Watched networks</h2><div class="grid" id="networks"></div></section>
+    <section><h2>Open incidents</h2><div id="openInc"></div></section>
+  </div>
+
+  <div id="tab-feed" hidden>
+    <div class="toolbar">
+      <select id="feedNet"><option value="">All networks</option></select>
+      <label><input type="checkbox" id="feedFlag"> Flagged only</label>
+      <button class="btn" id="feedPause">Pause</button>
+      <span class="muted" id="feedInfo"></span>
+    </div>
+    <div class="scroll"><table><thead><tr><th>Time (MYT)</th><th>Network</th><th>Type</th><th>Prefix</th><th>Origin</th><th>AS path</th><th>RIS peer</th></tr></thead><tbody id="feed"></tbody></table></div>
+  </div>
+
+  <div id="tab-prefixes" hidden>
+    <div class="toolbar">
+      <select id="pfxNet"><option value="">All networks</option></select>
+      <input id="pfxSearch" placeholder="Filter prefix…">
+      <span class="muted">Visibility = baseline RIS peers that still route the prefix to the expected origin.</span>
+    </div>
+    <div class="scroll"><table><thead><tr><th>Prefix</th><th>Network</th><th style="width:30%">Visibility</th><th>Peers seeing / baseline</th><th>All peers</th><th>Updated</th></tr></thead><tbody id="pfx"></tbody></table></div>
+    <div id="pfxDetail"></div>
+  </div>
+
+  <div id="tab-alerts" hidden>
+    <div class="toolbar">
+      <select id="incStatus"><option value="">All incidents</option><option value="open">Open</option><option value="resolved">Resolved</option></select>
+      <a class="btn" href="/api/export/incidents.csv">Export incidents CSV</a>
+      <a class="btn" href="/api/export/notifications.csv">Export notifications CSV</a>
+      <a class="btn" href="/api/export/prefix_visibility.csv">Export visibility CSV</a>
+    </div>
+    <section><div class="scroll"><table><thead><tr><th>Severity</th><th>Status</th><th>Network</th><th>Incident</th><th>First seen (MYT)</th><th>Duration</th><th>Peers</th><th>Prefixes</th></tr></thead><tbody id="incs"></tbody></table></div></section>
+    <section><h2>Notification log</h2><div class="scroll" style="max-height:340px"><table><thead><tr><th>Time (MYT)</th><th>Channel</th><th>Severity</th><th>Reason</th><th>Message</th></tr></thead><tbody id="notes"></tbody></table></div></section>
+  </div>
+
+  <div id="tab-about" hidden>
+    <div class="explain why"><h3>Data</h3><p>BGP updates stream live from <b>RIPE NCC RIS Live</b> (route collectors peering with hundreds of networks worldwide), filtered to the address space of the watched Malaysian networks. ASNs are verified against RIPEstat and PeeringDB, prefixes come from RIPEstat <code>announced-prefixes</code>, and the baseline is each RIS peer's actual route from RIPEstat <code>bgp-state</code>.</p></div>
+    <div class="two">
+      <div class="explain"><h3>Detectors</h3><p><b>Origin change / MOAS</b>: a watched prefix announced by an AS that never originated it.<br><b>More-specific</b>: a sub-prefix of watched space announced by another AS (the most dangerous hijack type).<br><b>RPKI invalid</b>: checked locally against the rpki-client VRP set (RFC 6811).<br><b>Visibility drop</b>: fewer baseline peers carry the prefix for longer than normal convergence.<br><b>Route leak (heuristic)</b>: valleys in the AS path, using CAIDA's transit-free clique and inferred relationships.</p></div>
+      <div class="explain"><h3>Alerting</h3><p>Findings are grouped into incidents per network and suspect AS, so one event pages once. Weak evidence (fewer than 3 RIS peers) waits for confirmation and is shown at reduced severity. Incidents re-notify only on escalation, resolve when the anomaly disappears, and re-opening within the cooldown is silent.</p></div>
+    </div>
+    <div class="explain"><h3>Limits</h3><p>BGP Watch only sees what RIS peers see, baselines are a few hours old, and route-leak checks depend on inferred relationships. Treat alerts as leads to investigate, not proof.</p></div>
+    <p class="muted" id="aboutMeta"></p>
+  </div>
+</main>
+<footer>BGP Watch Malaysia · data: RIPE NCC RIS Live &amp; RIPEstat, PeeringDB, CAIDA AS Rank, rpki-client VRPs · <a href="/metrics">/metrics</a></footer>
+<script src="/static/app.js"></script>
+</body>
+</html>

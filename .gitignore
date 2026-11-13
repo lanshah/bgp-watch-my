@@ -1,0 +1,18 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+# runtime data (rebuilt from live sources)
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/watchlist.json
+data/baseline.json
+data/vrps_watch.json
+data/recordings/
+data/*.log
+data/synthetic/
+data/cache/
+exports/*.csv
+!exports/.gitkeep

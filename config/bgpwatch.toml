@@ -1,0 +1,99 @@
+# BGP Watch Malaysia configuration.
+#
+# The ASNs below are *candidates*. `python -m bgpwatch build-watchlist` checks every one
+# against live sources (RIPEstat as-overview + country-resource-list, PeeringDB) and refuses
+# any ASN whose registered holder does not match `holder_keywords`. The verified result,
+# with source URLs and query times, is written to data/watchlist.json and docs/VERIFICATION.md.
+# Prefixes are never listed here: they are fetched live from RIPEstat announced-prefixes.
+
+[client]
+# Generic identifier sent to RIS Live (?client=) and RIPEstat (sourceapp=). No personal data.
+name = "bgp-watch-my"
+user_agent = "bgp-watch-my/1.0 (open-source BGP monitor; python-urllib)"
+
+[sources]
+ripestat = "https://stat.ripe.net/data"
+peeringdb = "https://www.peeringdb.com/api"
+caida_asrank = "https://api.asrank.caida.org/v2/graphql"
+ris_live = "wss://ris-live.ripe.net/v1/ws/"
+# Validated ROA Payloads (VRPs). rpki-client JSON, one ROA per line. Fallback is used if the first fails.
+vrp_urls = ["https://console.rpki-client.org/vrps.json", "https://rpki.cloudflare.com/rpki.json"]
+# RIPEstat allows max 8 concurrent requests per IP; we use fewer and space them out.
+max_concurrent = 4
+min_interval_s = 0.25
+cache_ttl_h = 12
+
+[[network]]
+key = "TM"
+name = "TM (Telekom Malaysia)"
+primary_asn = 4788
+sibling_asns = [9986, 17464, 17971, 18206, 23736, 38322]
+holder_keywords = ["TM TECHNOLOGY", "TELEKOM MALAYSIA", "TTSSB"]
+
+[[network]]
+key = "MAXIS"
+name = "Maxis"
+primary_asn = 9534
+sibling_asns = [17784, 132434]
+holder_keywords = ["MAXIS", "BINARIANG"]
+
+[[network]]
+key = "CELCOMDIGI"
+name = "CelcomDigi"
+primary_asn = 4818
+sibling_asns = [10081, 10030, 138008, 141407, 141408]
+holder_keywords = ["DIGI", "CELCOM"]
+
+[[network]]
+key = "TIME"
+name = "TIME dotCom"
+primary_asn = 9930
+sibling_asns = []
+holder_keywords = ["TIME DOTCOM", "TTNET-MY"]
+
+[[network]]
+key = "UMOBILE"
+name = "U Mobile"
+primary_asn = 38466
+sibling_asns = []
+holder_keywords = ["U MOBILE", "UMOBILE"]
+
+[[network]]
+key = "MYREN"
+name = "MYREN (Malaysian Research & Education Network)"
+primary_asn = 24514
+sibling_asns = []
+holder_keywords = ["MYREN", "MINISTRY OF HIGHER EDUCATION"]
+
+[detect]
+# A RIS peer must have the route for it to count as "seeing" a prefix.
+# Visibility is measured against the peers that saw the prefix in the baseline snapshot.
+visibility_warn_ratio = 0.60      # below 60 % of baseline peers -> WARNING
+visibility_crit_ratio = 0.20      # below 20 % -> CRITICAL (prefix effectively withdrawn)
+visibility_recover_ratio = 0.80   # hysteresis: must climb back above 80 % to clear
+visibility_hold_s = 180           # condition must hold this long (BGP convergence takes 1-3 min)
+visibility_min_baseline_peers = 20
+# An anomaly seen by fewer peers than this is reported at reduced severity.
+min_peers_for_full_severity = 3
+# Weak evidence (fewer peers than above) waits this long for confirmation before paging.
+confirm_window_s = 60
+# Path-length anomaly: unique-AS path length above baseline max + this margin.
+path_length_margin = 3
+evaluate_every_s = 10
+
+[alerts]
+cooldown_s = 900            # same incident key will not re-notify within 15 min
+resolve_quiet_s = 1800      # incidents with no new evidence for 30 min auto-resolve
+max_notifications_per_min = 6   # critical incidents always push; others wait for budget
+notify_min_severity = "medium"  # incidents below this are recorded on the dashboard but never pushed
+# Telegram is optional. Put BGPW_TELEGRAM_TOKEN and BGPW_TELEGRAM_CHAT_ID in .env (never commit it).
+telegram_min_severity = "high"
+
+[web]
+host = "127.0.0.1"
+port = 8060
+
+[storage]
+db_path = "data/bgpwatch.db"
+recordings_dir = "data/recordings"
+keep_updates_days = 7
