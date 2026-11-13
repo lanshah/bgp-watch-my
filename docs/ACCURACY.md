@@ -25,7 +25,7 @@ fixes have regression tests in `tests/`.
 |---|---|---|---|---|
 | 7, 11, 23, 42, 99 | 65 | 65 | 0 | 0 |
 
-## Per scenario (seed 7, 2835 messages, replayed in 0.46 s)
+## Per scenario (seed 7, 2835 messages, replayed in 0.76 s)
 
 | Scenario | Expected | Result | Peak severity | Notifications | Time to detect | Note |
 |---|---|---|---|---|---|---|

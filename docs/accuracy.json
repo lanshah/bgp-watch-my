@@ -192,7 +192,7 @@
     "low_severity_not_notified": 3,
     "resolved": 13
    },
-   "replay_wall_s": 0.46
+   "replay_wall_s": 0.76
   },
   {
    "expected_items": 13,
@@ -375,7 +375,7 @@
     "low_severity_not_notified": 3,
     "resolved": 13
    },
-   "replay_wall_s": 0.55
+   "replay_wall_s": 0.53
   },
   {
    "expected_items": 13,
@@ -558,7 +558,7 @@
     "low_severity_not_notified": 3,
     "resolved": 13
    },
-   "replay_wall_s": 0.46
+   "replay_wall_s": 0.53
   },
   {
    "expected_items": 13,
@@ -741,7 +741,7 @@
     "low_severity_not_notified": 3,
     "resolved": 13
    },
-   "replay_wall_s": 0.47
+   "replay_wall_s": 0.65
   },
   {
    "expected_items": 13,
@@ -924,7 +924,7 @@
     "low_severity_not_notified": 3,
     "resolved": 13
    },
-   "replay_wall_s": 0.46
+   "replay_wall_s": 0.62
   }
  ]
 }
