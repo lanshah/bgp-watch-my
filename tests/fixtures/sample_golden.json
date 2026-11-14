@@ -1,0 +1,78 @@
+{
+ "messages": 1502,
+ "announcements": 7467,
+ "withdrawals": 28,
+ "bad_messages": 0,
+ "rpki": {
+  "valid": 6878,
+  "invalid": 0,
+  "not-found": 589
+ },
+ "incidents": [
+  {
+   "key": "new_upstream|MAXIS|19551|1299",
+   "kind": "new_upstream",
+   "severity": "low",
+   "status": "open",
+   "peers": 2
+  },
+  {
+   "key": "new_upstream|TIME|19551|1299",
+   "kind": "new_upstream",
+   "severity": "low",
+   "status": "open",
+   "peers": 2
+  },
+  {
+   "key": "new_upstream|TIME|9930|37282",
+   "kind": "new_upstream",
+   "severity": "low",
+   "status": "resolved",
+   "peers": 1
+  },
+  {
+   "key": "new_upstream|TM|19551|1299",
+   "kind": "new_upstream",
+   "severity": "low",
+   "status": "open",
+   "peers": 2
+  },
+  {
+   "key": "new_upstream|TM|4788|34927",
+   "kind": "new_upstream",
+   "severity": "info",
+   "status": "resolved",
+   "peers": 1
+  },
+  {
+   "key": "new_upstream|TM|4788|34927",
+   "kind": "new_upstream",
+   "severity": "info",
+   "status": "resolved",
+   "peers": 1
+  },
+  {
+   "key": "new_upstream|TM|4788|37721",
+   "kind": "new_upstream",
+   "severity": "info",
+   "status": "resolved",
+   "peers": 1
+  },
+  {
+   "key": "new_upstream|TM|4788|37721",
+   "kind": "new_upstream",
+   "severity": "info",
+   "status": "resolved",
+   "peers": 1
+  },
+  {
+   "key": "new_upstream|TM|4788|9583",
+   "kind": "new_upstream",
+   "severity": "low",
+   "status": "resolved",
+   "peers": 2
+  }
+ ],
+ "notifications": 0,
+ "degraded_prefixes_at_end": 0
+}

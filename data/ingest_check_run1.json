@@ -1,0 +1,12 @@
+{
+ "prefixes": 20,
+ "archived_updates": 315,
+ "recorded_updates": 289,
+ "matched": 289,
+ "window_utc": [
+  "2026-11-13T17:41:30",
+  "2026-11-13T18:21:59"
+ ],
+ "archived_found_in_recording_pct": 91.7,
+ "recording_found_in_archive_pct": 100.0
+}

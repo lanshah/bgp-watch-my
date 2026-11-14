@@ -31,7 +31,7 @@ def cmd_setup(cfg, args):
         _log(f"  {n['name']}: origins {n['expected_origins']}, {len(n['prefixes'])} prefixes, "
              f"{len(n['covering'])} covering" + (f", REJECTED {rej}" if rej else ""))
     _log("[2/3] Building baseline (RIPEstat bgp-state + routing-status, CAIDA AS Rank) ...")
-    base = build_baseline(cfg, http, wl, log=_log)
+    base = build_baseline(cfg, http, wl, log=_log, refresh_state=getattr(args, "refresh", False))
     seeded = sum(1 for p in base["prefixes"].values() if p["peers"])
     _log(f"  baseline: {seeded}/{len(base['prefixes'])} prefixes seeded with per-peer routes; RIS snapshot "
          f"{base['ris_snapshot_times']}; {len(base['known_more_specifics'])} known more-specifics; "
@@ -101,6 +101,11 @@ def cmd_live(cfg, args):
     _log(f"Streaming RIS Live for {len(covering)} covering prefixes"
          + (f" for {args.duration} min" if args.duration else " (Ctrl+C to stop)")
          + (f"; recording to {cfg.recordings_dir}" if rec else ""))
+    sample = []
+    if args.crosscheck:
+        from .crosscheck import sample_prefixes
+        sample = sample_prefixes(mon.state, args.crosscheck_n)
+        _lg_check(cfg, mon, sample, "start")
     last_vrp = time.time()
 
     def on_tick(now):
@@ -130,7 +135,7 @@ def cmd_live(cfg, args):
     if rec:
         _log(f"Recorded {rec.lines} messages to: " + ", ".join(str(f) for f in rec.files))
     if args.crosscheck:
-        _crosscheck(cfg, mon, wl)
+        _lg_check(cfg, mon, sample, "end")
 
 
 def _refresh_vrps_bg(cfg, covering, mon):
@@ -144,42 +149,14 @@ def _refresh_vrps_bg(cfg, covering, mon):
         _log(f"  VRP refresh failed, keeping old set: {e}")
 
 
-def _crosscheck(cfg, mon, wl):
-    """Outside judge: compare our live per-peer RIB with RIPEstat's own latest bgp-state."""
-    from .baseline import peer_key_from_source_id
+def _lg_check(cfg, mon, sample, label):
+    """Outside judge: our per-peer RIB vs RIPEstat's near-real-time looking glass (see crosscheck.py)."""
+    from .crosscheck import compare
     from .sources import HttpClient
-    http = HttpClient(cfg)
-    _log("Cross-check: our live RIB vs RIPEstat bgp-state (fresh) ...")
-    exact = close = total = 0
-    diffs = []
-    ts = set()
-    for n in wl["networks"]:
-        for a in n["asns"]:
-            if not (a["accepted"] and a["announced"]):
-                continue
-            st = http.ripestat("bgp-state", resource=f"AS{a['asn']}", ttl=0)
-            ts.add(st.get("timestamp"))
-            theirs = {}
-            for r in st["bgp_state"]:
-                theirs.setdefault(r["target_prefix"], set()).add(peer_key_from_source_id(r["source_id"]))
-            for p, peers in theirs.items():
-                wp = mon.state.watched.get(p)
-                if wp is None:
-                    continue
-                ours = {k for k, path in mon.state.rib.get(p, {}).items()
-                        if mon.state.origin(path) in wp.expected_origins}
-                total += 1
-                if ours == peers:
-                    exact += 1
-                d = len(ours ^ peers)
-                if d <= max(2, 0.02 * len(peers)):
-                    close += 1
-                else:
-                    diffs.append((p, len(ours), len(peers), d))
-    res = {"prefixes_compared": total, "identical_peer_sets": exact, "within_2pct": close,
-           "ripestat_state_times": sorted(t for t in ts if t), "largest_differences": sorted(diffs, key=lambda x: -x[3])[:10]}
-    mon.store.set_meta(crosscheck=res)
-    _log(json.dumps(res, indent=1))
+    _log(f"Cross-check ({label}): our RIB vs RIPEstat looking-glass on {len(sample)} sampled prefixes ...")
+    res = compare(HttpClient(cfg), mon.state, sample, log=_log)
+    mon.store.set_meta(**{f"crosscheck_{label}": res})
+    return res
 
 
 def cmd_replay(cfg, args):
@@ -269,7 +246,8 @@ def cmd_make_sample(cfg, args):
     for n in swl["networks"]:
         n["prefixes"] = {p: o for p, o in n["prefixes"].items() if p in keep}
     (out / "watchlist.json").write_text(json.dumps(swl, indent=1), encoding="utf-8")
-    (out / "baseline.json").write_text(json.dumps(sub), encoding="utf-8")
+    with gzip.open(out / "baseline.json.gz", "wt", encoding="utf-8") as fh:
+        json.dump(sub, fh)
     shutil.copy(cfg.data_dir / "vrps_watch.json", out / "vrps.json")
     with gzip.open(out / "messages.jsonl.gz", "wt", encoding="utf-8") as fh:
         for m in msgs:
@@ -311,6 +289,23 @@ def cmd_export(cfg, args):
         _log(f"  {f}: {n} rows")
 
 
+def cmd_ingest_check(cfg, args):
+    """Outside judge for ingestion: recorded RIS Live messages vs the RIS archive (RIPEstat bgp-updates)."""
+    import collections
+    import random
+    from .crosscheck import ingest_check
+    from .replay import read_messages
+    from .sources import HttpClient
+    msgs = [m for m in read_messages(Path(args.bundle) / "messages.jsonl.gz") if m.get("type") == "ris_message"]
+    c = collections.Counter(p for m in msgs for a in (m["data"].get("announcements") or []) for p in a["prefixes"])
+    pool = [p for p, _ in c.most_common(400)]
+    sample = random.Random(args.seed).sample(pool, min(args.n, len(pool)))
+    res = ingest_check(HttpClient(cfg), msgs, sample, log=_log)
+    out = Path(args.bundle) / "ingest_check.json"
+    out.write_text(json.dumps({**res, "sample": sample, "seed": args.seed}, indent=1), encoding="utf-8")
+    _log(f"Saved to {out}")
+
+
 def cmd_report(cfg, args):
     from .report import write_report
     from .store import Store
@@ -325,7 +320,9 @@ def main(argv=None):
     ap.add_argument("--config", help="path to bgpwatch.toml")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    sub.add_parser("setup", help="verify ASNs, fetch prefixes, build baseline, download RPKI VRPs (online)")
+    p = sub.add_parser("setup", help="verify ASNs, fetch prefixes, build baseline, download RPKI VRPs (online)")
+    p.add_argument("--refresh", action="store_true",
+                   help="re-download the per-peer bgp-state snapshots even if cached (keeps other caches)")
     sub.add_parser("rpki-refresh", help="re-download RPKI VRPs")
 
     p = sub.add_parser("live", help="stream RIS Live and detect in real time")
@@ -335,7 +332,9 @@ def main(argv=None):
     p.add_argument("--open", action="store_true", help="open the dashboard in a browser")
     p.add_argument("--port", type=int)
     p.add_argument("--fresh", action="store_true", help="clear the live database first")
-    p.add_argument("--crosscheck", action="store_true", help="compare final RIB with RIPEstat bgp-state")
+    p.add_argument("--crosscheck", action="store_true",
+                   help="compare the RIB with RIPEstat looking-glass on a sample, before and after the run")
+    p.add_argument("--crosscheck-n", type=int, default=60, help="prefixes in the cross-check sample")
 
     p = sub.add_parser("replay", help="replay a bundle (recorded live data or synthetic)")
     p.add_argument("bundle")
@@ -373,6 +372,11 @@ def main(argv=None):
     p.add_argument("--db", default="data/bgpwatch.db")
     p.add_argument("--out")
 
+    p = sub.add_parser("ingest-check", help="compare a recorded bundle with the RIS archive (RIPEstat bgp-updates)")
+    p.add_argument("bundle")
+    p.add_argument("--n", type=int, default=20)
+    p.add_argument("--seed", type=int, default=3)
+
     p = sub.add_parser("report", help="write a Markdown summary of what a run saw")
     p.add_argument("--db", default="data/bgpwatch.db")
     p.add_argument("--out", default="docs/LIVE_RUN.md")
@@ -382,4 +386,5 @@ def main(argv=None):
     cfg = load_config(args.config)
     {"setup": cmd_setup, "rpki-refresh": cmd_rpki, "live": cmd_live, "replay": cmd_replay, "synth": cmd_synth,
      "demo": cmd_demo, "make-sample": cmd_make_sample, "evaluate": cmd_evaluate, "serve": cmd_serve,
-     "export-csv": cmd_export, "report": cmd_report}[args.cmd](cfg, args)
+     "export-csv": cmd_export, "report": cmd_report,
+     "ingest-check": cmd_ingest_check}[args.cmd](cfg, args)

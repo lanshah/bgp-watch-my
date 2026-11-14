@@ -1,0 +1,19 @@
+{
+ "kind": "recorded-live",
+ "label": "REAL RIS Live messages recorded by bgp-watch-my",
+ "source": "wss://ris-live.ripe.net (RIPE NCC RIS)",
+ "files": [
+  "live-20261113-17.jsonl.gz",
+  "live-20261113-18.jsonl.gz"
+ ],
+ "messages": 1502,
+ "start": 1794591690.11,
+ "end": 1794594119.44,
+ "baseline_built": "2026-11-13T17:41:07Z",
+ "rpki": {
+  "source": "https://console.rpki-client.org/vrps.json",
+  "buildtime": "2026-11-14T02:10:12Z",
+  "global_vrps": 1035005,
+  "kept": 2025
+ }
+}

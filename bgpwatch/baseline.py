@@ -33,7 +33,7 @@ def peer_key_from_ris(host: str, peer: str) -> str:
 
 
 def build_baseline(cfg: Config, http: HttpClient, wl: dict, out: Path | None = None,
-                   log=print) -> dict:
+                   log=print, refresh_state: bool = False) -> dict:
     out = out or cfg.data_dir / "baseline.json"
     prefixes: dict[str, dict] = {}
     rib: dict[str, dict[str, list]] = {}
@@ -51,7 +51,7 @@ def build_baseline(cfg: Config, http: HttpClient, wl: dict, out: Path | None = N
     def fetch_state(item):
         key, asn = item
         log(f"  bgp-state AS{asn} ({key}) ...")
-        return asn, http.ripestat("bgp-state", resource=f"AS{asn}", ttl=6 * 3600)
+        return asn, http.ripestat("bgp-state", resource=f"AS{asn}", ttl=0 if refresh_state else 6 * 3600)
 
     with ThreadPoolExecutor(max_workers=4) as pool:
         for asn, st in pool.map(fetch_state, announced):

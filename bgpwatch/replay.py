@@ -37,6 +37,9 @@ def load_bundle(path: Path) -> dict:
         f = path / f"{name}.json"
         if f.exists():
             b[name] = json.loads(f.read_text(encoding="utf-8"))
+        elif f.with_suffix(".json.gz").exists():  # large baselines are stored gzipped in committed samples
+            with gzip.open(f.with_suffix(".json.gz"), "rt", encoding="utf-8") as fh:
+                b[name] = json.load(fh)
     vf = path / "vrps.json"
     b["rpki"] = RpkiValidator.load(vf) if vf.exists() else RpkiValidator.empty()
     b["messages"] = path / "messages.jsonl.gz"
