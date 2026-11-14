@@ -1,0 +1,127 @@
+{
+ "messages": 2421,
+ "announcements": 10841,
+ "withdrawals": 475,
+ "bad_messages": 0,
+ "rpki": {
+  "valid": 9890,
+  "invalid": 1,
+  "not-found": 950
+ },
+ "incidents": [
+  {
+   "key": "more_specific_own|TM|18206",
+   "kind": "more_specific_own",
+   "severity": "info",
+   "status": "resolved",
+   "peers": 1
+  },
+  {
+   "key": "new_upstream|MAXIS|19551|1299",
+   "kind": "new_upstream",
+   "severity": "low",
+   "status": "resolved",
+   "peers": 1
+  },
+  {
+   "key": "new_upstream|MAXIS|19551|2914",
+   "kind": "new_upstream",
+   "severity": "low",
+   "status": "resolved",
+   "peers": 1
+  },
+  {
+   "key": "new_upstream|MAXIS|19551|4637",
+   "kind": "new_upstream",
+   "severity": "low",
+   "status": "resolved",
+   "peers": 1
+  },
+  {
+   "key": "new_upstream|TIME|19551|1299",
+   "kind": "new_upstream",
+   "severity": "low",
+   "status": "resolved",
+   "peers": 1
+  },
+  {
+   "key": "new_upstream|TIME|19551|2914",
+   "kind": "new_upstream",
+   "severity": "low",
+   "status": "resolved",
+   "peers": 1
+  },
+  {
+   "key": "new_upstream|TIME|19551|4637",
+   "kind": "new_upstream",
+   "severity": "low",
+   "status": "resolved",
+   "peers": 1
+  },
+  {
+   "key": "new_upstream|TIME|19551|7473",
+   "kind": "new_upstream",
+   "severity": "low",
+   "status": "resolved",
+   "peers": 1
+  },
+  {
+   "key": "new_upstream|TM|19551|4637",
+   "kind": "new_upstream",
+   "severity": "low",
+   "status": "resolved",
+   "peers": 1
+  },
+  {
+   "key": "new_upstream|TM|19551|9930",
+   "kind": "new_upstream",
+   "severity": "low",
+   "status": "resolved",
+   "peers": 1
+  },
+  {
+   "key": "new_upstream|TM|4788|34927",
+   "kind": "new_upstream",
+   "severity": "info",
+   "status": "resolved",
+   "peers": 1
+  },
+  {
+   "key": "new_upstream|TM|4788|34927",
+   "kind": "new_upstream",
+   "severity": "info",
+   "status": "resolved",
+   "peers": 1
+  },
+  {
+   "key": "new_upstream|TM|4788|37721",
+   "kind": "new_upstream",
+   "severity": "info",
+   "status": "resolved",
+   "peers": 1
+  },
+  {
+   "key": "new_upstream|TM|4788|37721",
+   "kind": "new_upstream",
+   "severity": "info",
+   "status": "resolved",
+   "peers": 1
+  },
+  {
+   "key": "new_upstream|TM|4788|9583",
+   "kind": "new_upstream",
+   "severity": "low",
+   "status": "resolved",
+   "peers": 2
+  },
+  {
+   "key": "rpki_invalid|TM|18206|invalid-length",
+   "kind": "rpki_invalid",
+   "severity": "medium",
+   "status": "open",
+   "peers": 1
+  }
+ ],
+ "notifications": 1,
+ "degraded_prefixes_at_end": 0
+}

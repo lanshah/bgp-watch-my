@@ -8,11 +8,13 @@ explains each alert in plain English on a local NOC-style dashboard.
 
 It runs on a normal Windows laptop with plain Python: no VM, no Docker, no API keys.
 
-![Dashboard overview](docs/screenshots/dashboard-live.png)
+![Dashboard overview after a real 58-minute live run](docs/screenshots/dashboard-live.png)
 
-| Incident page: why it fired (synthetic hijack) | Outage with visibility chart (synthetic) | Alert log (synthetic demo set) |
-|---|---|---|
-| ![Incident](docs/screenshots/incident-hijack.png) | ![Outage](docs/screenshots/incident-outage.png) | ![Alert log](docs/screenshots/alert-log.png) |
+*Real data: the dashboard after live run 2 (14 Nov 2026), with one real RPKI-invalid TM route open.*
+
+| Real incident: RPKI-invalid route (live run 2) | Incident page: why it fired (synthetic hijack) | Outage with visibility chart (synthetic) | Alert log (synthetic demo set) |
+|---|---|---|---|
+| ![Real RPKI incident](docs/screenshots/incident-rpki-real.png) | ![Incident](docs/screenshots/incident-hijack.png) | ![Outage](docs/screenshots/incident-outage.png) | ![Alert log](docs/screenshots/alert-log.png) |
 
 ---
 
@@ -147,7 +149,48 @@ from primary RIS data, and I have not done that yet (see *Limitations*).
 
 ## Results (measured, not claimed)
 
-RESULTS_PLACEHOLDER
+Every number below comes from a file in `docs/` that the tool generated, and can be reproduced.
+
+**Detection accuracy on the labelled synthetic set** ([ACCURACY.md](docs/ACCURACY.md)).
+It has 16 scenarios built from reserved documentation ASNs and test prefixes, with 13
+expected detections. 5 scenarios are benign look-alikes that must not page anyone: a 60 s
+flap, a ROA-valid sibling origin, a prepending change, 10 RIS peer sessions going down, and
+an own traffic-engineering more-specific. The set was replayed with 5 different seeds of
+background noise:
+
+| Expected detections | Detected | Missed | False alerts | Notifications per seed |
+|---|---|---|---|---|
+| 65 | **65** | 0 | **0** | 11 (from about 400 raw findings) |
+
+This is a test of the detection logic against scenarios I wrote. It is not a measure of
+real-world recall. Earlier versions failed it (2 false alerts, double paging), and those
+failures drove fixes that now have regression tests.
+
+**Two live runs on the real RIS feed, 14 Nov 2026** ([LIVE_RUN.md](docs/LIVE_RUN.md)):
+
+| | Run 1 (40.5 min) | Run 2 (58.2 min) |
+|---|---|---|
+| RIS Live messages / prefix announcements | 1,502 / 7,467 | 2,421 / 10,841 |
+| Connection drops, gaps, malformed frames | 0 / 0 / 0 | 0 / 0 / 0 |
+| Incidents opened → notifications | 9 → 0 | 16 → **1** |
+
+* **One real finding:** TM's `2401:b000:0:3::/64` (AS18206) is RPKI-invalid, because it is
+  longer than its ROAs' /48 maxLength. RIPEstat's Routinator-based `rpki-validation`
+  independently agrees (`invalid_length`). The tool wrongly labelled it a *new* more-specific:
+  it has been visible to a handful of RIS peers since at least 27 Oct. Both are documented.
+* **No false pages on real traffic.** The other 24 incidents were low/info, such as
+  Imperva/Incapsula (AS19551) DDoS-protection announcements inside Malaysian space, and RIS
+  peer sessions flapping.
+
+**Outside checks on the data pipeline:**
+
+| Question | Judge | Result |
+|---|---|---|
+| Is the per-peer routing table right? | RIPEstat looking-glass, 60 random prefixes, after 58 min live | 99.93 % AS-path agreement; peer sets within 2 peers for 100 % of prefixes |
+| Does the live feed deliver what RIPE archived? | RIPEstat `bgp-updates` (RIS archive), 20 prefixes, 40 min | 91.7 % of archived updates received live; 100 % of received updates are in the archive |
+
+**Not included:** replays of famous historical incidents. None was verified end to end from
+archive data in this build, so none is claimed.
 
 ## What this shows employers
 
@@ -158,7 +201,7 @@ RESULTS_PLACEHOLDER
 | **NOC operations** | Severity model, alert grouping and de-duplication, confirmation windows, cooldown and flap suppression, auto-resolve, runbook-style "what to check next" on every incident |
 | **Network data sources** | RIPE RIS Live (websocket), RIPEstat, PeeringDB and CAIDA AS Rank APIs, used within their published limits, with caching and a generic client ID |
 | **Monitoring and observability** | Live dashboard, JSON API, Prometheus `/metrics`, CSV export and a Power BI report guide ([`docs/powerbi.md`](docs/powerbi.md)) |
-| **Engineering discipline** | Event-time pipeline for deterministic replay, labelled test set with a measured accuracy check, 40+ pytest tests, an independent code review with every fix regression-tested ([`docs/CRITIQUE.md`](docs/CRITIQUE.md)), GitHub Actions CI (Windows and Linux), honest limits |
+| **Engineering discipline** | Event-time pipeline for deterministic replay, labelled test set with a measured accuracy check, 48 pytest tests (including golden tests on two real recordings), an independent code review with every fix regression-tested ([`docs/CRITIQUE.md`](docs/CRITIQUE.md)), GitHub Actions CI (Windows and Linux), honest limits |
 | **Python** | asyncio websockets, SQLite (WAL) shared across threads, standard-library HTTP server, typed dataclasses, a single third-party dependency |
 
 **Why it matters for Malaysian ISPs:** a hijack or leak of TM, Maxis or CelcomDigi prefixes can
@@ -191,6 +234,10 @@ hostnames are FQDNs (`rrc21.ripe.net`) and the `origin` attribute is upper-case.
 - **Baseline age.** RIPEstat `bgp-state` lags real time by a few hours, and updates missed while
   the websocket is reconnecting are not back-filled. Visibility can drift slightly from reality
   until routes are re-announced. The cross-check in *Results* measures this.
+- **Low-visibility routes are missing from the baseline.** Prefixes seen by only a handful of
+  RIS peers are not seeded, so a long-standing one can show up as "new" when a peer
+  re-announces it. Live run 2 hit exactly this with a real RPKI-invalid /64. An RPKI audit of
+  such routes at setup would close this gap; it is not built yet.
 - **Route-leak and new-upstream checks are heuristics.** They rely on CAIDA's *inferred*
   relationships (monthly, sometimes wrong) and on the baseline. Legitimate new transit looks
   the same as a leak. They are reported at medium/high severity, never critical.

@@ -33,6 +33,8 @@ def live_report(store: Store, title: str = "Live run report") -> str:
     incs = store.query("SELECT id, kind, network, severity, status, first_seen, resolved_at, actor_asn, peers, "
                        "prefixes, summary FROM incidents ORDER BY first_seen")
     notes = store.query("SELECT COUNT(*) n FROM notifications WHERE channel='dashboard'")[0]["n"]
+    quiet = store.query("SELECT COUNT(*) n FROM incidents i WHERE NOT EXISTS (SELECT 1 FROM notifications n "
+                        "WHERE n.incident_id = i.id AND n.channel = 'dashboard')")[0]["n"]
     upd = store.query("SELECT network, COUNT(*) n, SUM(kind='A') a, SUM(kind='W') w FROM updates GROUP BY network")
     vis = store.query("SELECT network, COUNT(*) n, AVG(ratio) avg, MIN(ratio) min, SUM(ratio < 0.6) degraded "
                       "FROM prefix_state WHERE baseline > 0 GROUP BY network")
@@ -68,8 +70,8 @@ def live_report(store: Store, title: str = "Live run report") -> str:
     lines += ["", "## Detections", "",
               f"* Raw findings: {e.get('findings', 0)} → incidents opened: **{e.get('incidents_opened', 0)}** "
               f"(reopened silently {e.get('incidents_reopened', 0)}) → notifications: **{notes}**.",
-              f"* Findings folded into existing incidents: {e.get('dedup_suppressed', 0)}; info/low incidents "
-              f"recorded without paging: {e.get('low_severity_not_notified', 0)}.", ""]
+              f"* Findings folded into existing incidents: {e.get('dedup_suppressed', 0)}; incidents recorded "
+              f"on the dashboard without a notification (below the paging threshold): {quiet}.", ""]
     if by:
         lines += ["| Incident kind | Severity | Count |", "|---|---|---|"]
         lines += [f"| {k} | {s} | {n} |" for (k, s), n in sorted(by.items())]

@@ -111,3 +111,12 @@ def test_info_never_pages():
         e.on_finding(f(100, f"rrc00|p{i}", sev="info", key="more_specific_own|N|1", kind="more_specific_own"))
     e.tick(400)
     assert notes(s) == [] and e.stats["low_severity_not_notified"] == 1
+
+
+def test_quiet_incident_counted_once_across_ticks():
+    # regression (live run 2): the counter grew on every tick and showed 643 for 16 incidents
+    e, s = eng()
+    e.on_finding(f(100, "rrc00|p1", sev="low", key="new_upstream|N|1", kind="new_upstream"))
+    for t in range(110, 1000, 10):
+        e.tick(t)
+    assert e.stats["low_severity_not_notified"] == 1

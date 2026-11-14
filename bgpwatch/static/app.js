@@ -41,14 +41,17 @@ $("incStatus").onchange = () => refresh();
 function renderHeader(s) {
   const m = s.meta, mode = m.mode || "-";
   const mEl = $("mode");
-  mEl.textContent = mode === "live" ? "LIVE" : mode === "synthetic" ? "SYNTHETIC REPLAY" : "REPLAY";
-  mEl.className = "badge " + (mode === "live" ? "live" : mode === "synthetic" ? "synthetic" : "replay");
+  const ended = mode === "live" && m.stopped_at && (!m.started_at || m.stopped_at >= m.started_at);
+  mEl.textContent = ended ? "LIVE RUN ENDED" : mode === "live" ? "LIVE" : mode === "synthetic" ? "SYNTHETIC REPLAY" : "REPLAY";
+  mEl.className = "badge " + (ended ? "replay" : mode === "live" ? "live" : mode === "synthetic" ? "synthetic" : "replay");
   const ban = $("banner");
   if (mode === "synthetic") { ban.hidden = false; ban.textContent = "SYNTHETIC TEST DATA: fictional networks, documentation ASNs and test prefixes. Not real events."; }
   else if (mode !== "live" && m.bundle) { ban.hidden = false; ban.textContent = "REPLAY of " + (m.bundle.label || m.replay_of || "recording") + (m.bundle.start ? " · recorded " + fmt(m.bundle.start, true) + " MYT" : ""); }
   else ban.hidden = true;
   const c = m.connection, conn = $("conn");
-  if (mode === "live" && c) {
+  if (ended) {
+    conn.innerHTML = `<span class="dot off"></span>stored results of a live run that stopped ${fmt(m.stopped_at, true)} MYT (not updating)`;
+  } else if (mode === "live" && c) {
     const age = m.last_msg_ts ? s.server_time - m.last_msg_ts : null;
     conn.innerHTML = `<span class="dot ${c.connected ? "on" : "off"}"></span>${c.connected ? "RIS Live connected" : "RIS Live disconnected (" + esc(c.error || "") + ")"}${age != null ? " · last update " + dur(age) + " ago" : ""}`;
   } else if (mode !== "live") {

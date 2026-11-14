@@ -127,7 +127,7 @@ def cmd_live(cfg, args):
         mon.finish()
         if rec:
             rec.close()
-        store.set_meta(live_stats=stats, stopped_at=time.time())
+        store.set_meta(live_stats=stats, stopped_at=time.time(), connection={"connected": False, "error": "run ended", "since": time.time()})
     c = mon.counts
     _log(f"Live run finished: {c['messages']} messages, {c['announcements']} announcements, "
          f"{c['withdrawals']} withdrawals; incidents opened {mon.engine.stats['incidents_opened']}, "
@@ -301,6 +301,10 @@ def cmd_ingest_check(cfg, args):
     pool = [p for p, _ in c.most_common(400)]
     sample = random.Random(args.seed).sample(pool, min(args.n, len(pool)))
     res = ingest_check(HttpClient(cfg), msgs, sample, log=_log)
+    if res["archive_not_ready"]:
+        _log("The RIS archive has no updates for this window yet (it is filled in with a delay). "
+             "Nothing saved; run this again in a few hours.")
+        sys.exit(1)
     out = Path(args.bundle) / "ingest_check.json"
     out.write_text(json.dumps({**res, "sample": sample, "seed": args.seed}, indent=1), encoding="utf-8")
     _log(f"Saved to {out}")

@@ -43,8 +43,9 @@ function chart(samples) {
   if (inc.error) { root.innerHTML = '<div class="empty">Incident not found.</div>'; return; }
   const mode = sum.meta.mode;
   const m = document.getElementById("mode");
-  m.textContent = mode === "live" ? "LIVE" : mode === "synthetic" ? "SYNTHETIC REPLAY" : "REPLAY";
-  m.className = "badge " + (mode === "live" ? "live" : mode === "synthetic" ? "synthetic" : "replay");
+  const sm = sum.meta, ended = mode === "live" && sm.stopped_at && (!sm.started_at || sm.stopped_at >= sm.started_at);
+  m.textContent = ended ? "LIVE RUN ENDED" : mode === "live" ? "LIVE" : mode === "synthetic" ? "SYNTHETIC REPLAY" : "REPLAY";
+  m.className = "badge " + (ended ? "replay" : mode === "live" ? "live" : mode === "synthetic" ? "synthetic" : "replay");
   if (mode === "synthetic") { const b = document.getElementById("banner"); b.hidden = false; b.textContent = "SYNTHETIC TEST DATA: fictional networks, documentation ASNs and test prefixes. Not a real event."; }
   const net = (sum.networks.find((n) => n.key === inc.network) || {}).name || inc.network;
   const x = inc.explanation || {}, ev = inc.evidence || {}, first = ev.first || {};
@@ -58,7 +59,7 @@ function chart(samples) {
       <h2 style="font-size:20px;margin:4px 0 10px">${esc(x.summary || inc.title)}</h2>
       <div class="kpis">
         <div class="kpi"><div class="v">${esc(fmt(inc.first_seen).slice(11))}</div><div class="l">first seen (${esc(fmt(inc.first_seen).slice(0, 10))})</div></div>
-        <div class="kpi"><div class="v">${dur((inc.resolved_at || inc.last_seen) - inc.first_seen)}</div><div class="l">${inc.status === "resolved" ? "duration" : "open for"}</div></div>
+        <div class="kpi"><div class="v">${dur((inc.resolved_at || Math.max(inc.last_seen, sum.meta.event_time || 0)) - inc.first_seen)}</div><div class="l">${inc.status === "resolved" ? "duration" : ended ? "open when the run ended" : "open for"}</div></div>
         ${inc.kind === "visibility_drop"
           ? `<div class="kpi"><div class="v">${ev.worst && ev.worst.ratio != null ? (ev.worst.ratio * 100).toFixed(0) + " %" : "-"}</div><div class="l">worst visibility${ev.worst ? " (" + esc(ev.worst.seen) + "/" + esc(ev.worst.baseline) + " peers)" : ""}</div></div>`
           : `<div class="kpi"><div class="v">${esc(inc.status === "resolved" ? (ev.peers_ever || inc.peers) : inc.peers)}</div><div class="l">RIS peers ${inc.status === "resolved" ? "that carried it" : "carrying it now"}</div></div>`}

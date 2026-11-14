@@ -101,7 +101,10 @@ def ingest_check(http: HttpClient, messages: list[dict], prefixes: list[str], lo
     tot = {"prefixes": 0, "archived_updates": 0, "recorded_updates": 0, "matched": 0, "window_utc": [fmt(t0), fmt(t1)]}
     for p in prefixes:
         try:
-            d = http.ripestat("bgp-updates", resource=p, starttime=fmt(t0), endtime=fmt(t1), ttl=7 * 86400)
+            # The RIS archive fills in with a delay: only trust a cached answer fetched >= 6 h after the
+            # window ended (a negative ttl forces a fresh request), so an early, incomplete reply is never reused.
+            ttl = min(7 * 86400, time.time() - (t1 + 6 * 3600))
+            d = http.ripestat("bgp-updates", resource=p, starttime=fmt(t0), endtime=fmt(t1), ttl=ttl)
         except SourceError:
             continue
         arch = []
@@ -120,6 +123,8 @@ def ingest_check(http: HttpClient, messages: list[dict], prefixes: list[str], lo
         tot["prefixes"] += 1
         tot["archived_updates"] += len(arch)
         tot["recorded_updates"] += len(ours[p])
+    # An empty archive for a window that had live updates means RIPE has not ingested it yet.
+    tot["archive_not_ready"] = tot["archived_updates"] == 0 and tot["recorded_updates"] > 0
     tot["archived_found_in_recording_pct"] = round(100 * tot["matched"] / max(1, tot["archived_updates"]), 1)
     tot["recording_found_in_archive_pct"] = round(100 * tot["matched"] / max(1, tot["recorded_updates"]), 1)
     log(f"  ingest check on {tot['prefixes']} prefixes: archive has {tot['archived_updates']} updates, recording has "

@@ -57,6 +57,7 @@ class Incident:
         self.reopened = 0
         self.just_reopened = False
         self.rate_limited = False
+        self.counted_quiet = False         # counted once in low_severity_not_notified
         self.notified_rank = -1
         self.first_evidence = f.evidence
         self.latest_evidence = f.evidence
@@ -240,7 +241,8 @@ class AlertEngine:
                 self.stats["cooldown_suppressed"] += 1
             return
         if r < severity_rank(self.notify_min):
-            if inc.notified_rank < 0 and inc.findings == 1:
+            if inc.notified_rank < 0 and not inc.counted_quiet:  # once per incident, not per tick
+                inc.counted_quiet = True
                 self.stats["low_severity_not_notified"] += 1
             return
         if (inc.kind != "visibility_drop" and inc.notified_rank < 0 and inc.peers() < self.min_peers
